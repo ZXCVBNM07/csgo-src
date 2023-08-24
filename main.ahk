@@ -1,4 +1,4 @@
-﻿#Include classMemory.ahk
+#Include classMemory.ahk
 
 #NoEnv
 #Persistent
@@ -57,7 +57,7 @@ Loop {
 		Loop % MaxPlayer {	
 			Global Entity := csgo.read(client + dwEntityList + A_index*0x10, "int")
 			
-			if (Entity=0 || Entity=LocalPlayer)
+			if (Entity=0 || Entity=LocalPlayer || EntityLifeState() || EntityDormant())
 				Continue
 				
 			EntityTeam := csgo.read(Entity + m_iTeamNum, "Uint")
@@ -66,7 +66,36 @@ Loop {
 			if (LocalTeam != EntityTeam)  {
 				
 				if (EnableAimbot && GetKeyState(Hotkey, "P") && LocalHealth > 0) {
-					Aimbot()
+				
+            	FOV := 0		
+				BestAngle := new Vector([0.0, 0.0, 0.0])
+            	BestFOV := 5
+			
+				LocalOrigin := GetVecOrigin()
+            	ViewAngle := GetViewAngles()
+            	AimPunch := GetVecPunchAngles()
+				LocalEyePos := GetVecEyes()
+				BoneMatrix := VecBone(8)
+				CurrentViewAngle := new Vector([ ViewAngle.x + AimPunch.x * 2.0, ViewAngle.y + AimPunch.y * 2.0,  ViewAngle.z + AimPunch.z * 2.0])
+				Angle := CalculateAngle(LocalEyePos, BoneMatrix, CurrentViewAngle)
+				FOV := Hypot(Angle.x, Angle.y)
+				FixedAngle := ClampAngle(NormalizeAngle(Angle))
+			
+					if (FOV < BestFOV)
+                        BestFOV := FOV
+                        BestAngle := FixedAngle
+						
+					if (FOV != BestFOV)
+				        Continue
+						
+					if (!LocalHealth) 
+		                Continue	
+								
+			        if ((SpottedByMask(Entity)))
+			            Continue
+						
+					if (BestAngle.x < FOV and BestAngle.y < FOV and BestAngle.x != 0.0 and BestAngle.y != 0.0)
+					    SetViewAngle(new Vector([ViewAngle.x + BestAngle.x, ViewAngle.y + BestAngle.y, ViewAngle.z + BestAngle.z]))	
 				}
 			}
 			
@@ -166,6 +195,18 @@ GetLocalPlayer() {
 	Return csgo.read(client + dwLocalPlayer, "Uint")
 }
 
+EntityLifeState() {
+	Return csgo.read(Entity + m_lifeState, "Uint")
+}
+
+EntityDormant() {
+	Return csgo.read(Entity + m_bDormant, "Uint")
+}
+
+SpottedByMask(v) {
+	return csgo.read(v + m_bSpottedByMask, "int64")
+}
+
 IsInGame() {
 	Return csgo.read(engine + dwClientState, "Uint", dwClientState_State)=6
 }
@@ -178,28 +219,6 @@ atan2(y, x) {
 atan2f(y, x) {
 	static atan2f_func := DllCall("GetProcAddress", "Ptr", DllCall("LoadLibrary", "Str", "msvcrt.dll", "Ptr"), "AStr", "atan2f", "Ptr")
 	return dllcall(atan2f_func, "float", y, "float", x, "CDECL float")
-}
-
-Aimbot() {
-					static BestAngle := new Vector([0.0, 0.0, 0.0])
-					static BestFOV := 60
-					
-					LocalOrigin := GetVecOrigin()
-                    ViewAngle := GetViewAngles()
-                    AimPunch := GetVecPunchAngles()
-					LocalEyePos := GetVecEyes()
-					BoneMatrix := VecBone(8)
-					CurrentViewAngle := new Vector([ ViewAngle.x + AimPunch.x * 2.0, ViewAngle.y + AimPunch.y * 2.0,  ViewAngle.z + AimPunch.z * 2.0])
-					Angle := CalculateAngle(LocalEyePos, BoneMatrix, CurrentViewAngle)
-					FOV := Hypot(Angle.x, Angle.y)
-					FixedAngle := ClampAngle(NormalizeAngle(Angle))
-					
-					if (FOV < BestFOV)
-                        BestFOV := FOV
-                        BestAngle := FixedAngle
-						
-					if (BestAngle.x < FOV and BestAngle.y < FOV and BestAngle.x != 0.0 and BestAngle.y != 0.0)
-					    SetViewAngle(new Vector([ViewAngle.x + BestAngle.x, ViewAngle.y + BestAngle.y, ViewAngle.z + BestAngle.z]))	
 }
 
 settings_gui:
